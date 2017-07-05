@@ -9,6 +9,7 @@ import os
 
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.base import BaseEstimator, TransformerMixin, ClassifierMixin
 from sklearn.utils import check_array
@@ -32,6 +33,24 @@ from keras.callbacks import EarlyStopping
 # load train and test data
 train = pd.read_csv('input/train.csv')
 test = pd.read_csv('input/test.csv')
+
+# Select only best features
+features = ['X0',
+                'X5',
+                'X118',
+                'X127',
+                'X47',
+                'X315',
+                'X311',
+                'X179',
+                'X314',
+                'X232',
+                'X29',
+                'X263',
+                'X261']
+train = train[features + ['ID', 'y']]
+test = test[features + ['ID']]
+
 # encode categorical data
 for c in train.columns:
     if train[c].dtype == 'object':
@@ -61,32 +80,32 @@ def r2_keras(y_true, y_pred):
 # build the neural network
 model = Sequential()
 
-model.add(Dense(n_feats, input_dim=n_feats, kernel_constraint=maxnorm(3)))
+model.add(Dense(400, input_dim=n_feats, kernel_constraint=maxnorm(3)))
 model.add(BatchNormalization())
 model.add(Activation('relu'))
 model.add(Dropout(0.2))
 
-model.add(Dense(n_feats, kernel_constraint=maxnorm(3)))
+model.add(Dense(300, kernel_constraint=maxnorm(3)))
 model.add(BatchNormalization())
 model.add(Activation('relu'))
 model.add(Dropout(0.3))
 
-model.add(Dense(n_feats//2, kernel_constraint=maxnorm(3)))
+model.add(Dense(200, kernel_constraint=maxnorm(3)))
 model.add(BatchNormalization())
 model.add(Activation('relu'))
 model.add(Dropout(0.3))
 
-model.add(Dense(n_feats//2, kernel_constraint=maxnorm(3)))
+model.add(Dense(100, kernel_constraint=maxnorm(3)))
 model.add(BatchNormalization())
 model.add(Activation('relu'))
 model.add(Dropout(0.3))
 
-model.add(Dense(n_feats//2, kernel_constraint=maxnorm(3)))
+model.add(Dense(10, kernel_constraint=maxnorm(3)))
 model.add(BatchNormalization())
 model.add(Activation('relu'))
 model.add(Dropout(0.3))
 
-model.add(Dense(1))
+model.add(Dense(1, activation='linear'))
 
 #%% compile model
 model.compile(optimizer='rmsprop',
@@ -98,15 +117,30 @@ print(model.summary())
 #from keras.utils.visualize_util import plot
 #plot(model, to_file='digit-recognizer/model.png')
 
+# train/validation split
+X_tr, X_val, y_tr, y_val = train_test_split(
+    X_train,
+    y_train,
+    test_size=0.2
+)
+
 callbacks = [
     EarlyStopping(
         monitor='val_r2_keras',
-        patience=40,
+        patience=20,
         mode='max',
         verbose=1)]
 
 #%% fit the model with validation
-hist = model.fit(X_train, y_train, epochs=200, validation_split=0.2, batch_size=1, verbose=2, callbacks=callbacks)
+hist = model.fit(X_tr,
+                 y_tr,
+                 epochs=200,
+                 #validation_split=0.2,
+                 validation_data=(X_val, y_val),
+                 batch_size=1,
+                 verbose=2,
+                 callbacks=callbacks
+                 )
 print(hist.history)
 
 #save model to file
@@ -121,7 +155,7 @@ plt.title('model accuracy')
 plt.ylabel('R^2')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
-plt.savefig('r2_keras.png')
+plt.savefig('r2_keras_valdata.png')
 
 
 # # Plot accuracy
@@ -161,6 +195,6 @@ y_pred = model.predict(X_test, batch_size=1).ravel()
 # create submission csv file
 dirname = 'output'
 count = len(os.listdir(os.path.join(os.getcwd(), dirname))) + 1
-filename = 'sub' + str(count) + 'keras' + '.csv'
+filename = 'sub' + str(count) + '_keras' + '.csv'
 pd.concat([test.ID, pd.Series(y_pred)], axis=1).to_csv(dirname + '/' + filename,
                                                        header=['ID', 'y'], index=False)

@@ -1,7 +1,5 @@
-# Headline
+# Mercedes-Benz Greener Manufacturing - Kaggle Competition
 
-## hi
+_Dario Arcos-Díaz_
 
-This is a test.
-
-wonderful!
+These are the notebooks and scripts used for my submissions to the Kaggle Competition.
