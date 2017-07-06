@@ -7,6 +7,10 @@ sns.set_palette('Spectral')
 import time
 import os
 
+# make np.seed fixed
+seed=420
+np.random.seed(seed)
+
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split
