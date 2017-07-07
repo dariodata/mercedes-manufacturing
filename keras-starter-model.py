@@ -267,7 +267,9 @@ if os.path.isfile(model_path):
     model = load_model(model_path, custom_objects={'r2_keras': r2_keras})
 
 print('Making predictions...')
-y_pred = model.predict(X_test, batch_size=1).ravel()
+
+# predictions
+y_pred = model.predict(X_test).ravel()
 
 # create submission csv file
 dirname = 'output'
