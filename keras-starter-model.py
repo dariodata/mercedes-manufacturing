@@ -1,37 +1,25 @@
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-#% matplotlib inline
-import seaborn as sns
-sns.set_palette('Spectral')
 import time
 import os
-
-# make np.seed fixed
-seed=420
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+# %matplotlib inline
+import seaborn as sns
+sns.set_palette('Spectral')
+# fix seed for reproducibility
+seed = 420
 np.random.seed(seed)
 
-from sklearn.model_selection import KFold
-from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
-from sklearn.base import BaseEstimator, TransformerMixin, ClassifierMixin
-from sklearn.utils import check_array
-from sklearn.linear_model import LassoLarsCV
-from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.random_projection import GaussianRandomProjection
 from sklearn.random_projection import SparseRandomProjection
 from sklearn.decomposition import PCA, FastICA
 from sklearn.decomposition import TruncatedSVD
-from sklearn.metrics import r2_score
 from sklearn.preprocessing import LabelEncoder
 
-# import the packages
+from keras import backend as k
 from keras.models import Sequential, load_model
-from keras.layers import Dense, Dropout, BatchNormalization, Activation
-from keras.layers.convolutional import Convolution2D, MaxPooling2D
-from keras.utils.np_utils import to_categorical
-from keras.constraints import maxnorm
+from keras.layers import Dense, Dropout, BatchNormalization
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.layers.advanced_activations import ELU
 
@@ -41,18 +29,18 @@ test = pd.read_csv('input/test.csv')
 
 # Select only best features
 features = ['X0',
-                'X5',
-                'X118',
-                'X127',
-                'X47',
-                'X315',
-                'X311',
-                'X179',
-                'X314',
-                'X232',
-                'X29',
-                'X263',
-                'X261']
+            'X5',
+            'X118',
+            'X127',
+            'X47',
+            'X315',
+            'X311',
+            'X179',
+            'X314',
+            'X232',
+            'X29',
+            'X263',
+            'X261']
 train = train[features + ['ID', 'y']]
 test = test[features + ['ID']]
 
@@ -64,7 +52,7 @@ for c in train.columns:
         train[c] = lbl.transform(list(train[c].values))
         test[c] = lbl.transform(list(test[c].values))
 # remove the previously identified outlier
-#train = train.drop(883, axis=0)
+# train = train.drop(883, axis=0)
 X_train = train.drop('y', axis=1)
 y_train = train['y']
 X_test = test
@@ -117,8 +105,6 @@ for i in range(1, n_comp + 1):
     extra_features_train['srp_' + str(i)] = srp_results_train[:, i - 1]
     extra_features_test['srp_' + str(i)] = srp_results_test[:, i - 1]
 
-extra_features_train.shape, extra_features_test.shape
-
 X_train = np.hstack((X_train, extra_features_train))
 X_test = np.hstack((X_test, extra_features_test))
 
@@ -130,14 +116,10 @@ X_test = np.array(X_test)
 n_train, n_feats = X_train.shape
 n_test, _ = X_test.shape
 
-# define metrics function
-from keras import backend as K
-def r2_keras(y_true, y_pred):
-    SS_res =  K.sum(K.square( y_true - y_pred ))
-    SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
-    return ( 1 - SS_res/(SS_tot + K.epsilon()) )
 
-#%% Set up the neural network
+
+
+# %% Set up the neural network
 
 # build the neural network
 model = Sequential()
@@ -157,27 +139,39 @@ model.add(BatchNormalization())
 model.add(ELU(alpha=1.0))
 model.add(Dropout(0.3))
 
-model.add(Dense(n_feats//2))
+model.add(Dense(n_feats // 2))
 model.add(BatchNormalization())
 model.add(ELU(alpha=1.0))
 model.add(Dropout(0.3))
 
-model.add(Dense(n_feats//4))
+model.add(Dense(n_feats // 4))
 model.add(BatchNormalization())
 model.add(ELU(alpha=1.0))
 model.add(Dropout(0.3))
 
 model.add(Dense(1, activation='linear'))
 
-#%% compile model
+
+def r2_keras(y_true, y_pred):
+    """
+    Custom metric function r^2 for accuracy
+    :param y_true:
+    :param y_pred:
+    :return: r^2
+    """
+    SS_res = k.sum(k.square(y_true - y_pred))
+    SS_tot = k.sum(k.square(y_true - k.mean(y_true)))
+    return 1 - SS_res / (SS_tot + k.epsilon())
+
+
+# compile model
 model.compile(optimizer='adam',
               loss='MSE',
               metrics=[r2_keras, 'accuracy'])
 print(model.summary())
 
-#%%
-#from keras.utils.visualize_util import plot
-#plot(model, to_file='digit-recognizer/model.png')
+# from keras.utils.visualize_util import plot
+# plot(model, to_file='digit-recognizer/model.png')
 
 # model path for saving model
 model_path = 'output/model_ELU.h5'
@@ -207,7 +201,7 @@ callbacks = [
 hist = model.fit(X_tr,
                  y_tr,
                  epochs=2000,
-                 #validation_split=0.2,
+                 # validation_split=0.2,
                  validation_data=(X_val, y_val),
                  batch_size=32,
                  verbose=2,
@@ -215,10 +209,9 @@ hist = model.fit(X_tr,
                  )
 print(hist.history)
 
-#save model to file
+# save model to file
 model.save(model_path)
 
-#%%
 # Plot R^2
 plt.figure()
 plt.plot(hist.history['r2_keras'])
@@ -229,7 +222,6 @@ plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
 plt.savefig('r2_keras_ELU.png')
 
-
 # # Plot accuracy
 # plt.figure()
 # plt.plot(hist.history['acc'])
@@ -239,8 +231,7 @@ plt.savefig('r2_keras_ELU.png')
 # plt.xlabel('epoch')
 # plt.legend(['train', 'test'], loc='upper left')
 # plt.savefig('r2_keras.png')
-#
-# #%%
+
 # # Plot loss
 # plt.figure()
 # plt.plot(hist.history['loss'])
@@ -251,14 +242,13 @@ plt.savefig('r2_keras_ELU.png')
 # plt.legend(['train', 'test'], loc='upper left')
 # plt.savefig('r2_keras.png')
 
+# %% fit model without validation
+# model.fit(X_train, y_train, nb_epoch=10, batch_size=32)
 
-#%% fit model without validation
-#model.fit(X_train, y_train, nb_epoch=10, batch_size=32)
-
-#%% evaluate on test data
-#loss, accuracy = model.evaluate(X_test, y_test)
-#print('loss:', loss)
-#print('accuracy:', accuracy)
+# evaluate on test data
+# loss, accuracy = model.evaluate(X_test, y_test)
+# print('loss:', loss)
+# print('accuracy:', accuracy)
 
 # if best iteration's model was saved then load and use it
 if os.path.isfile(model_path):
