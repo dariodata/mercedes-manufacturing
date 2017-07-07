@@ -116,10 +116,11 @@ X_test = np.array(X_test)
 n_train, n_feats = X_train.shape
 n_test, _ = X_test.shape
 
+print('Finished data pre-processing.')
+print('Train set shape: ', X_train.shape)
+print('Test set shape: ', X_test.shape)
 
-
-
-# %% Set up the neural network
+print('Creating neural network...')
 
 # build the neural network
 model = Sequential()
@@ -168,13 +169,15 @@ def r2_keras(y_true, y_pred):
 model.compile(optimizer='adam',
               loss='MSE',
               metrics=[r2_keras, 'accuracy'])
+
+print('Finished compiling model:')
 print(model.summary())
 
 # from keras.utils.visualize_util import plot
 # plot(model, to_file='digit-recognizer/model.png')
 
 # model path for saving model
-model_path = 'output/model_ELU.h5'
+model_path = 'output/model_ELU_1.h5'
 
 # train/validation split
 X_tr, X_val, y_tr, y_val = train_test_split(
@@ -195,7 +198,11 @@ callbacks = [
         monitor='val_r2_keras',
         save_best_only=True,
         mode='max',
-        verbose=1)]
+        verbose=1)
+]
+
+print('Start model fitting...')
+t0 = time.time()
 
 # fit the model with validation data
 hist = model.fit(X_tr,
@@ -207,10 +214,13 @@ hist = model.fit(X_tr,
                  verbose=2,
                  callbacks=callbacks
                  )
+
+print('Finished fitting model. Done: {:.1f}s'.format(time.time() - t0))
 print(hist.history)
+print('Maximum r2_keras value: {0}'.format(np.max(hist.history['val_r2_keras'])))
 
 # save model to file
-model.save(model_path)
+# model.save(model_path) # not necessary because of ModelCheckPoint callback
 
 # Plot R^2
 plt.figure()
@@ -220,7 +230,7 @@ plt.title('model accuracy')
 plt.ylabel('R^2')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
-plt.savefig('r2_keras_ELU.png')
+plt.savefig('output/r2_keras_ELU_1.png')
 
 # # Plot accuracy
 # plt.figure()
@@ -250,10 +260,13 @@ plt.savefig('r2_keras_ELU.png')
 # print('loss:', loss)
 # print('accuracy:', accuracy)
 
+print('Loading saved best model...')
+
 # if best iteration's model was saved then load and use it
 if os.path.isfile(model_path):
     model = load_model(model_path, custom_objects={'r2_keras': r2_keras})
 
+print('Making predictions...')
 y_pred = model.predict(X_test, batch_size=1).ravel()
 
 # create submission csv file
@@ -263,4 +276,5 @@ filename = 'sub' + str(count) + '_keras_ELU' + '.csv'
 pd.concat([test.ID, pd.Series(y_pred)], axis=1).to_csv(dirname + '/' + filename,
                                                        header=['ID', 'y'], index=False)
 
+print('Finished. Predictions saved as file: ', filename)
 os.system('say "finished running code"')
