@@ -27,6 +27,7 @@ from keras.layers.advanced_activations import ELU
 train = pd.read_csv('input/train.csv')
 test = pd.read_csv('input/test.csv')
 
+'''
 # Select only best features
 features = ['X0',
             'X5',
@@ -43,6 +44,7 @@ features = ['X0',
             'X261']
 train = train[features + ['ID', 'y']]
 test = test[features + ['ID']]
+'''
 
 # encode categorical data
 for c in train.columns:
@@ -51,8 +53,10 @@ for c in train.columns:
         lbl.fit(list(train[c].values) + list(test[c].values))
         train[c] = lbl.transform(list(train[c].values))
         test[c] = lbl.transform(list(test[c].values))
+
 # remove the previously identified outlier
 # train = train.drop(883, axis=0)
+
 X_train = train.drop('y', axis=1)
 y_train = train['y']
 X_test = test
@@ -190,7 +194,7 @@ X_tr, X_val, y_tr, y_val = train_test_split(
 callbacks = [
     EarlyStopping(
         monitor='val_r2_keras',
-        patience=50,
+        patience=100,
         mode='max',
         verbose=1),
     ModelCheckpoint(
@@ -226,7 +230,7 @@ print('Maximum r2_keras value: {0}'.format(np.max(hist.history['val_r2_keras']))
 plt.figure()
 plt.plot(hist.history['r2_keras'])
 plt.plot(hist.history['val_r2_keras'])
-plt.title('model accuracy')
+plt.title('Model accuracy')
 plt.ylabel('R^2')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
