@@ -32,7 +32,8 @@ from keras.layers import Dense, Dropout, BatchNormalization, Activation
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.utils.np_utils import to_categorical
 from keras.constraints import maxnorm
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.layers.advanced_activations import ELU
 
 # load train and test data
 train = pd.read_csv('input/train.csv')
@@ -141,35 +142,35 @@ def r2_keras(y_true, y_pred):
 # build the neural network
 model = Sequential()
 
-model.add(Dense(400, input_dim=n_feats, kernel_constraint=maxnorm(3)))
+model.add(Dense(n_feats, input_dim=n_feats))
 model.add(BatchNormalization())
-model.add(Activation('relu'))
+model.add(ELU(alpha=1.0))
 model.add(Dropout(0.5))
 
-model.add(Dense(300, kernel_constraint=maxnorm(3)))
+model.add(Dense(n_feats))
 model.add(BatchNormalization())
-model.add(Activation('relu'))
+model.add(ELU(alpha=1.0))
 model.add(Dropout(0.3))
 
-model.add(Dense(200, kernel_constraint=maxnorm(3)))
+model.add(Dense(n_feats))
 model.add(BatchNormalization())
-model.add(Activation('relu'))
+model.add(ELU(alpha=1.0))
 model.add(Dropout(0.3))
 
-model.add(Dense(100, kernel_constraint=maxnorm(3)))
+model.add(Dense(n_feats//2))
 model.add(BatchNormalization())
-model.add(Activation('relu'))
+model.add(ELU(alpha=1.0))
 model.add(Dropout(0.3))
 
-model.add(Dense(10, kernel_constraint=maxnorm(3)))
+model.add(Dense(n_feats//4))
 model.add(BatchNormalization())
-model.add(Activation('relu'))
+model.add(ELU(alpha=1.0))
 model.add(Dropout(0.3))
 
 model.add(Dense(1, activation='linear'))
 
 #%% compile model
-model.compile(optimizer='rmsprop',
+model.compile(optimizer='adam',
               loss='MSE',
               metrics=[r2_keras, 'accuracy'])
 print(model.summary())
@@ -178,6 +179,9 @@ print(model.summary())
 #from keras.utils.visualize_util import plot
 #plot(model, to_file='digit-recognizer/model.png')
 
+# model path for saving model
+model_path = 'output/model_ELU.h5'
+
 # train/validation split
 X_tr, X_val, y_tr, y_val = train_test_split(
     X_train,
@@ -185,10 +189,11 @@ X_tr, X_val, y_tr, y_val = train_test_split(
     test_size=0.2
 )
 
+# define callbacks before fitting
 callbacks = [
     EarlyStopping(
         monitor='val_r2_keras',
-        patience=100,
+        patience=50,
         mode='max',
         verbose=1),
     ModelCheckpoint(
@@ -198,20 +203,20 @@ callbacks = [
         mode='max',
         verbose=1)]
 
-#%% fit the model with validation
+# fit the model with validation data
 hist = model.fit(X_tr,
                  y_tr,
                  epochs=2000,
                  #validation_split=0.2,
                  validation_data=(X_val, y_val),
                  batch_size=32,
-                 verbose=2#,
-                 #callbacks=callbacks
+                 verbose=2,
+                 callbacks=callbacks
                  )
 print(hist.history)
 
 #save model to file
-model.save('output/model_keras3.h5')
+model.save(model_path)
 
 #%%
 # Plot R^2
@@ -222,7 +227,7 @@ plt.title('model accuracy')
 plt.ylabel('R^2')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
-plt.savefig('r2_keras_valdata_batch32_extrafeats.png')
+plt.savefig('r2_keras_ELU.png')
 
 
 # # Plot accuracy
@@ -255,14 +260,16 @@ plt.savefig('r2_keras_valdata_batch32_extrafeats.png')
 #print('loss:', loss)
 #print('accuracy:', accuracy)
 
-#%% predict
-#model = load_model('digit-recognizer/model_kaggle.h5')
+# if best iteration's model was saved then load and use it
+if os.path.isfile(model_path):
+    model = load_model(model_path, custom_objects={'r2_keras': r2_keras})
+
 y_pred = model.predict(X_test, batch_size=1).ravel()
 
 # create submission csv file
 dirname = 'output'
 count = len(os.listdir(os.path.join(os.getcwd(), dirname))) + 1
-filename = 'sub' + str(count) + '_keras_extrafeats' + '.csv'
+filename = 'sub' + str(count) + '_keras_ELU' + '.csv'
 pd.concat([test.ID, pd.Series(y_pred)], axis=1).to_csv(dirname + '/' + filename,
                                                        header=['ID', 'y'], index=False)
 
