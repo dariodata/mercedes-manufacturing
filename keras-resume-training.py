@@ -32,7 +32,7 @@ from keras.layers import Dense, Dropout, BatchNormalization, Activation
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.utils.np_utils import to_categorical
 from keras.constraints import maxnorm
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # load train and test data
 train = pd.read_csv('input/train.csv')
@@ -131,52 +131,23 @@ n_test, _ = X_test.shape
 
 # define metrics function
 from keras import backend as K
+
+
 def r2_keras(y_true, y_pred):
     SS_res =  K.sum(K.square( y_true - y_pred ))
     SS_tot = K.sum(K.square( y_true - K.mean(y_true) ) )
     return ( 1 - SS_res/(SS_tot + K.epsilon()) )
 
-#%% Set up the neural network
 
-# build the neural network
-model = Sequential()
+# reload model
+model_path = 'output/model_keras3_resumed.h5'
+model = load_model(model_path, custom_objects={'r2_keras': r2_keras})
 
-model.add(Dense(400, input_dim=n_feats, kernel_constraint=maxnorm(3)))
-model.add(BatchNormalization())
-model.add(Activation('relu'))
-model.add(Dropout(0.5))
-
-model.add(Dense(300, kernel_constraint=maxnorm(3)))
-model.add(BatchNormalization())
-model.add(Activation('relu'))
-model.add(Dropout(0.3))
-
-model.add(Dense(200, kernel_constraint=maxnorm(3)))
-model.add(BatchNormalization())
-model.add(Activation('relu'))
-model.add(Dropout(0.3))
-
-model.add(Dense(100, kernel_constraint=maxnorm(3)))
-model.add(BatchNormalization())
-model.add(Activation('relu'))
-model.add(Dropout(0.3))
-
-model.add(Dense(10, kernel_constraint=maxnorm(3)))
-model.add(BatchNormalization())
-model.add(Activation('relu'))
-model.add(Dropout(0.3))
-
-model.add(Dense(1, activation='linear'))
-
-#%% compile model
-model.compile(optimizer='rmsprop',
-              loss='MSE',
-              metrics=[r2_keras, 'accuracy'])
+# compile model
+# model.compile(optimizer='rmsprop',
+#               loss='MSE',
+#               metrics=[r2_keras, 'accuracy'])
 print(model.summary())
-
-#%%
-#from keras.utils.visualize_util import plot
-#plot(model, to_file='digit-recognizer/model.png')
 
 # train/validation split
 X_tr, X_val, y_tr, y_val = train_test_split(
@@ -205,13 +176,13 @@ hist = model.fit(X_tr,
                  #validation_split=0.2,
                  validation_data=(X_val, y_val),
                  batch_size=32,
-                 verbose=2#,
-                 #callbacks=callbacks
+                 verbose=2,
+                 callbacks=callbacks
                  )
 print(hist.history)
 
 #save model to file
-model.save('output/model_keras3.h5')
+model.save('output/model_keras3_resumed.h5')
 
 #%%
 # Plot R^2
@@ -222,47 +193,15 @@ plt.title('model accuracy')
 plt.ylabel('R^2')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
-plt.savefig('r2_keras_valdata_batch32_extrafeats.png')
+plt.savefig('r2_keras_valdata_batch32_extrafeats_resume_savebest.png')
 
-
-# # Plot accuracy
-# plt.figure()
-# plt.plot(hist.history['acc'])
-# plt.plot(hist.history['val_acc'])
-# plt.title('model accuracy')
-# plt.ylabel('accuracy')
-# plt.xlabel('epoch')
-# plt.legend(['train', 'test'], loc='upper left')
-# plt.savefig('r2_keras.png')
-#
-# #%%
-# # Plot loss
-# plt.figure()
-# plt.plot(hist.history['loss'])
-# plt.plot(hist.history['val_loss'])
-# plt.title('model loss')
-# plt.ylabel('loss')
-# plt.xlabel('epoch')
-# plt.legend(['train', 'test'], loc='upper left')
-# plt.savefig('r2_keras.png')
-
-
-#%% fit model without validation
-#model.fit(X_train, y_train, nb_epoch=10, batch_size=32)
-
-#%% evaluate on test data
-#loss, accuracy = model.evaluate(X_test, y_test)
-#print('loss:', loss)
-#print('accuracy:', accuracy)
-
-#%% predict
-#model = load_model('digit-recognizer/model_kaggle.h5')
+# predict
 y_pred = model.predict(X_test, batch_size=1).ravel()
 
 # create submission csv file
 dirname = 'output'
 count = len(os.listdir(os.path.join(os.getcwd(), dirname))) + 1
-filename = 'sub' + str(count) + '_keras_extrafeats' + '.csv'
+filename = 'sub' + str(count) + '_keras_extrafeats_savebest' + '.csv'
 pd.concat([test.ID, pd.Series(y_pred)], axis=1).to_csv(dirname + '/' + filename,
                                                        header=['ID', 'y'], index=False)
 
