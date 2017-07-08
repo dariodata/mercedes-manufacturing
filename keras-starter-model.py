@@ -27,6 +27,35 @@ from keras.layers.advanced_activations import ELU
 train = pd.read_csv('input/train.csv')
 test = pd.read_csv('input/test.csv')
 
+##############################################
+# homogenize median of duplicates in train set
+features = train.columns[2:]
+cat_features = []
+for c in train.columns:
+    if train[c].dtype == 'object':
+        cat_features.append(c)
+duplicates = train[train.duplicated(subset=features, keep=False)].sort_values(by=cat_features)
+medians = pd.read_csv('input/X0X118X127medians.csv')
+medians = medians[medians.columns[:6]]
+medians = medians.dropna(axis=0, subset=['y_median'])
+
+
+def get_median(a, b, c):
+    criterion1 = (medians['X0'] == a)
+    criterion2 = (medians['X118'] == b)
+    criterion3 = (medians['X127'] == c)
+    return medians[criterion1 & criterion2 & criterion3].y_median.values[0]
+
+
+def replace_median(df):
+    df['y'] = get_median(df['X0'], df['X118'], df['X127'])
+    return df
+
+
+duplicates = duplicates.apply(lambda x: replace_median(x), axis=1)
+train.loc[train.ID.isin(duplicates.ID), 'y'] = duplicates['y']
+##############################################################
+
 '''
 # Select only best features
 features = ['X0',
@@ -181,7 +210,7 @@ print(model.summary())
 # plot(model, to_file='digit-recognizer/model.png')
 
 # model path for saving model
-model_path = 'output/model_ELU_1.h5'
+model_path = 'output/model_ELU_2dup.h5'
 
 # train/validation split
 X_tr, X_val, y_tr, y_val = train_test_split(
@@ -234,7 +263,7 @@ plt.title('Model accuracy')
 plt.ylabel('R^2')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
-plt.savefig('output/r2_keras_ELU_1.png')
+plt.savefig('output/r2_keras_ELU_2dup.png')
 
 # # Plot accuracy
 # plt.figure()
