@@ -185,3 +185,18 @@ sub = pd.DataFrame()
 sub['ID'] = id_test
 sub['y'] = y_pred*0.75 + results*0.25
 sub.to_csv('output/sub53_lasso_xgb.csv', index=False)
+
+if __name__ == '__main__':
+
+    # load data
+    # handle duplicates
+    # transform categorical features
+    # get additional features
+    # consolidate data for training
+    # train data model stacked
+    # predict
+    # train data model xgb
+    # predict
+    # consolidate predictions
+    # generate output
+

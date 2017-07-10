@@ -11,7 +11,7 @@ seed = 420
 np.random.seed(seed)
 
 import xgboost as xgb
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, train_test_split
 from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import make_pipeline
 from sklearn.base import BaseEstimator, TransformerMixin, ClassifierMixin
@@ -31,23 +31,22 @@ warnings.filterwarnings('ignore')
 
 # Quickstart
 # load train and test data
-train = pd.read_csv('input/train.csv')
-test = pd.read_csv('input/test.csv')
+def load_data():
+    train = pd.read_csv('input/train.csv')
+    test = pd.read_csv('input/test.csv')
+    return train, test
 
 ##############################################
 # homogenize median of duplicates in train set
-features = train.columns[2:]
-cat_features = []
-for c in train.columns:
-    if train[c].dtype == 'object':
-        cat_features.append(c)
-duplicates = train[train.duplicated(subset=features, keep=False)].sort_values(by=cat_features)
-medians = pd.read_csv('input/X0X118X127medians.csv')
-medians = medians[medians.columns[:6]]
-medians = medians.dropna(axis=0, subset=['y_median'])
+def load_medians_data():
+    medians = pd.read_csv('input/X0X118X127medians.csv')
+    medians = medians[medians.columns[:6]]
+    medians = medians.dropna(axis=0, subset=['y_median'])
+    return medians
 
 
 def get_median(a, b, c):
+    medians = load_medians_data()
     criterion1 = (medians['X0'] == a)
     criterion2 = (medians['X118'] == b)
     criterion3 = (medians['X127'] == c)
@@ -59,22 +58,27 @@ def replace_median(df):
     return df
 
 
-duplicates = duplicates.apply(lambda x: replace_median(x), axis=1)
-train.loc[train.ID.isin(duplicates.ID), 'y'] = duplicates['y']
+def handle_duplicates(train):
+    features = train.columns[2:]
+    cat_features = []
+    for c in train.columns:
+        if train[c].dtype == 'object':
+            cat_features.append(c)
+    duplicates = train[train.duplicated(subset=features, keep=False)].sort_values(by=cat_features)
+    duplicates = duplicates.apply(lambda x: replace_median(x), axis=1)
+    train.loc[train.ID.isin(duplicates.ID), 'y'] = duplicates['y']
+    return train
 ##############################################################
 
 # encode categorical data
-for c in train.columns:
-    if train[c].dtype == 'object':
-        lbl = LabelEncoder()
-        lbl.fit(list(train[c].values) + list(test[c].values))
-        train[c] = lbl.transform(list(train[c].values))
-        test[c] = lbl.transform(list(test[c].values))
-# remove the previously identified outlier
-#train = train.drop(883, axis=0)
-X_train = train.drop('y', axis=1)
-y_train = train['y']
-X_test = test
+def encode_categoricals(train, test):
+    for c in train.columns:
+        if train[c].dtype == 'object':
+            lbl = LabelEncoder()
+            lbl.fit(list(train[c].values) + list(test[c].values))
+            train[c] = lbl.transform(list(train[c].values))
+            test[c] = lbl.transform(list(test[c].values))
+    return train, test
 
 
 class StackingEstimator(BaseEstimator, TransformerMixin):
@@ -98,7 +102,7 @@ class StackingEstimator(BaseEstimator, TransformerMixin):
 
         return X_transformed
 
-seed=420
+
 stacked_pipeline = make_pipeline(
     StackingEstimator(estimator=LassoLarsCV(normalize=True)),
     StackingEstimator(estimator=GradientBoostingRegressor(learning_rate=0.001, loss="huber", max_depth=3,
@@ -108,16 +112,36 @@ stacked_pipeline = make_pipeline(
     LassoLarsCV()
 )
 
-# stacked model is trained without the extra features
-t0 = time.time()
-stacked_pipeline.fit(X_train, y_train)
-y_pred = stacked_pipeline.predict(X_test)
-print("Done: {:.1f} s".format(time.time() - t0))
 
 
-# create submission csv file
-dirname = 'output'
-count = len(os.listdir(os.path.join(os.getcwd(), dirname))) + 1
-filename = 'sub' + str(count) + '_lasso_stacked' + '.csv'
-pd.concat([test.ID, pd.Series(y_pred)], axis=1).to_csv(dirname + '/' + filename,
-                                                       header=['ID', 'y'], index=False)
+if __name__ == '__main__':
+    # load train and test data
+    train, test = load_data()
+    # handle duplicates
+    train = handle_duplicates(train)
+    # transform categorical features
+    train, test = encode_categoricals(train, test)
+    # consolidate data for training
+    X_train = train.drop('y', axis=1)
+    y_train = train['y']
+    X_test = test
+    # train model
+    t0 = time.time()
+    stacked_pipeline.fit(X_train, y_train)
+    print("Finished training. Done: {:.1f} s".format(time.time() - t0))
+    # predict
+    y_pred = stacked_pipeline.predict(X_test)
+    # generate output
+    dirname = 'output'
+    count = len(os.listdir(os.path.join(os.getcwd(), dirname))) + 1
+    filename = 'sub' + str(count) + '_lasso_stacked' + '.csv'
+    pd.concat([test.ID, pd.Series(y_pred)], axis=1).to_csv(dirname + '/' + filename,
+                                                           header=['ID', 'y'], index=False)
+
+    # validation
+    train_orig = pd.read_csv('input/train.csv')
+    X_tr, X_val, y_tr, _ = train_test_split(X_train, y_train, test_size=0.2, random_state=seed)
+    _, _, _, y_val = train_test_split(X_train, train_orig['y'], test_size=0.2, random_state=seed)
+    print('Accuracy:', stacked_pipeline.score(X_val, y_val))
+    print("Done: {:.1f} s".format(time.time() - t0))
+
