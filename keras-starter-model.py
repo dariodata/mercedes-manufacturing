@@ -210,20 +210,20 @@ print(model.summary())
 # plot(model, to_file='digit-recognizer/model.png')
 
 # model path for saving model
-previous_model_path = 'output/model_ELU_2dup_val_resumed.h5'
-model_path = 'output/model_ELU_2dup_val_resumed2.h5'
+previous_model_path = 'output/model_ELU_2dup_val_resumed3.h5'
+model_path = 'output/model_ELU_2dup_val_resumed4.h5'
 
 
 # train/validation split
 train_orig = pd.read_csv('input/train.csv')
-X_tr, X_val, y_tr, _ = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
-_, _, _, y_val = train_test_split(X_train, train_orig['y'], test_size=0.2, random_state=0)
+X_tr, X_val, y_tr, _ = train_test_split(X_train, y_train, test_size=0.2, random_state=2)
+_, _, _, y_val = train_test_split(X_train, train_orig['y'], test_size=0.2, random_state=2)
 
 # define callbacks before fitting
 callbacks = [
     EarlyStopping(
         monitor='val_r2_keras',
-        patience=100,
+        patience=200,
         mode='max',
         verbose=1),
     ModelCheckpoint(
@@ -267,7 +267,7 @@ plt.title('Model accuracy')
 plt.ylabel('R^2')
 plt.xlabel('epoch')
 plt.legend(['train', 'test'], loc='upper left')
-plt.savefig('output/r2_keras_ELU_2dup_val_resumed2.png')
+plt.savefig('output/r2_keras_ELU_2dup_val_resumed4.png')
 
 # # Plot accuracy
 # plt.figure()
@@ -311,7 +311,7 @@ y_pred = model.predict(X_test).ravel()
 # create submission csv file
 dirname = 'output'
 count = len(os.listdir(os.path.join(os.getcwd(), dirname))) + 1
-filename = 'sub' + str(count) + '_keras_ELU_dup_val_resumed2' + '.csv'
+filename = 'sub' + str(count) + '_keras_ELU_dup_val_resumed4' + '.csv'
 pd.concat([test.ID, pd.Series(y_pred)], axis=1).to_csv(dirname + '/' + filename,
                                                        header=['ID', 'y'], index=False)
 
